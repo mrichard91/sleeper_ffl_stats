@@ -158,11 +158,33 @@ function useProxyAvailable() {
   return ok; // null=loading
 }
 
-// Tier heuristic (log of trending) on a 1-5 scale (1=best, 5=worst)
-function computeTierScore(playerId: string, trending: TrendingItem[]): number {
-  const t = trending.find((x) => x.player_id === playerId)?.count ?? 0;
-  const norm = t > 0 ? Math.min(1, Math.log10(1 + t) / 5) : 0; // 0..1
-  return Math.max(1, 5 - Math.floor(norm * 5));
+// Tier heuristic combining rostered %, starting %, and trending on a 1-5 scale (1=best, 5=worst)
+function computeTierScore(
+  playerId: string,
+  rosters: Roster[] | null,
+  trending: TrendingItem[] | null
+): number {
+  const total = rosters?.length ?? 0;
+  let rostered = 0;
+  let started = 0;
+  if (total > 0 && rosters) {
+    rosters.forEach((r) => {
+      if (r.players.includes(playerId)) {
+        rostered++;
+        if (r.starters.includes(playerId)) started++;
+      }
+    });
+  }
+  const rosteredPct = total > 0 ? rostered / total : 0;
+  const startingPct = total > 0 ? started / total : 0;
+  const trendCount = trending?.find((x) => x.player_id === playerId)?.count ?? 0;
+  const trendScore = trendCount > 0 ? Math.min(1, Math.log10(1 + trendCount) / 5) : 0;
+  const score = 0.6 * startingPct + 0.3 * rosteredPct + 0.1 * trendScore;
+  if (score >= 0.8) return 1;
+  if (score >= 0.6) return 2;
+  if (score >= 0.4) return 3;
+  if (score >= 0.2) return 4;
+  return 5;
 }
 const positionOf = (p?: PlayerMeta) => p?.position || "";
 const nameOf = (p?: PlayerMeta) => p?.full_name || `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim();
@@ -247,7 +269,7 @@ export default function App() {
     const trend = trendingAdd || [];
     const rows = roster.players.map((pid) => {
       const p = players[pid];
-      const tier = computeTierScore(pid, trend);
+      const tier = computeTierScore(pid, rosters, trend);
       const starter = startersSet.has(pid);
       return {
         id: pid,
@@ -269,7 +291,7 @@ export default function App() {
       });
     }
     return rows.sort((a, b) => (a.starter === b.starter ? a.tier - b.tier : a.starter ? -1 : 1));
-  }, [roster, players, trendingAdd, startersSet, sortByPos]);
+  }, [roster, players, rosters, trendingAdd, startersSet, sortByPos]);
 
   const posCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -298,7 +320,7 @@ export default function App() {
       .filter((p) => !mine.has(p!.player_id));
     return cands
       .map((p) => {
-        const tier = computeTierScore(p!.player_id, trendingAdd);
+        const tier = computeTierScore(p!.player_id, rosters, trendingAdd);
         const fit = needs.includes(positionOf(p)) ? 1 : 0;
         return {
           id: p!.player_id,
@@ -312,7 +334,7 @@ export default function App() {
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
-  }, [players, roster, trendingAdd, needs, rosterRows.length]);
+  }, [players, roster, rosters, trendingAdd, needs, rosterRows.length]);
 
   const teamRatings = useMemo(() => {
     if (!rosters || !players) return [] as any[];
@@ -323,7 +345,7 @@ export default function App() {
         const p = players[pid];
         if (!p) return;
         const pos = positionOf(p);
-        const tier = computeTierScore(pid, trend);
+        const tier = computeTierScore(pid, rosters, trend);
         (tiersByPos[pos] ||= []).push(tier);
       });
       const allTiers: number[] = [];
