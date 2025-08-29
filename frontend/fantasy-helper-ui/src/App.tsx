@@ -26,6 +26,10 @@ import {
   Input,
   Sheet,
   Typography,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanel,
 } from "@mui/joy";
 import Stack from "@mui/joy/Stack";
 import Chip from "@mui/joy/Chip";
@@ -173,6 +177,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const proxyOk = useProxyAvailable();
   const mockMode = proxyOk === false;
+  const [view, setView] = useState<"team" | "all">("team");
+  const [selectedRosterId, setSelectedRosterId] = useState<number | undefined>(undefined);
 
   async function loadLeagues() {
     setLoading(true);
@@ -222,13 +228,21 @@ export default function App() {
     if (!u) return rosters[0];
     return rosters.find((r) => r.owner_id === u.user_id) || rosters[0];
   }, [rosters, users, username]);
+  useEffect(() => {
+    if (myRoster) setSelectedRosterId(myRoster.roster_id);
+  }, [myRoster]);
 
-  const startersSet = useMemo(() => new Set(myRoster?.starters || []), [myRoster]);
+  const roster: Roster | undefined = useMemo(() => {
+    if (!rosters) return undefined;
+    return rosters.find((r) => r.roster_id === selectedRosterId) || myRoster;
+  }, [rosters, selectedRosterId, myRoster]);
+
+  const startersSet = useMemo(() => new Set(roster?.starters || []), [roster]);
 
   const rosterRows = useMemo(() => {
-    if (!myRoster || !players) return [] as any[];
+    if (!roster || !players) return [] as any[];
     const trend = trendingAdd || [];
-    return myRoster.players.map((pid) => {
+    return roster.players.map((pid) => {
       const p = players[pid];
       const tier = computeTierScore(pid, trend);
       const starter = startersSet.has(pid);
@@ -243,8 +257,8 @@ export default function App() {
         tier,
         starter,
       };
-    }).sort((a, b) => (a.starter === b.starter ? b.tier - a.tier : (a.starter ? -1 : 1)));
-  }, [myRoster, players, trendingAdd, startersSet]);
+    }).sort((a, b) => (a.starter === b.starter ? b.tier - a.tier : a.starter ? -1 : 1));
+  }, [roster, players, trendingAdd, startersSet]);
 
   const posCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -266,7 +280,7 @@ export default function App() {
 
   const targets = useMemo(() => {
     if (!players || !rosterRows.length || !trendingAdd) return [] as any[];
-    const mine = new Set((myRoster?.players || []));
+    const mine = new Set((roster?.players || []));
     const cands = trendingAdd
       .map((t) => players[t.player_id])
       .filter(Boolean)
@@ -279,7 +293,39 @@ export default function App() {
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
-  }, [players, myRoster, trendingAdd, needs, rosterRows.length]);
+  }, [players, roster, trendingAdd, needs, rosterRows.length]);
+
+  const teamRatings = useMemo(() => {
+    if (!rosters || !players) return [] as any[];
+    const trend = trendingAdd || [];
+    return rosters.map((r) => {
+      const tiersByPos: Record<string, number[]> = {};
+      r.players.forEach((pid) => {
+        const p = players[pid];
+        if (!p) return;
+        const pos = positionOf(p);
+        const tier = computeTierScore(pid, trend);
+        (tiersByPos[pos] ||= []).push(tier);
+      });
+      const allTiers: number[] = [];
+      Object.values(tiersByPos).forEach((arr) => allTiers.push(...arr));
+      const rating = allTiers.length ? allTiers.reduce((a, b) => a + b, 0) / allTiers.length : 0;
+      const posAvgs = Object.entries(tiersByPos).map(([pos, arr]) => ({
+        pos,
+        avg: arr.reduce((a, b) => a + b, 0) / arr.length,
+      }));
+      const strength = posAvgs.reduce(
+        (max, cur) => (cur.avg > max.avg ? cur : max),
+        { pos: "—", avg: -Infinity }
+      ).pos;
+      const weakness = posAvgs.reduce(
+        (min, cur) => (cur.avg < min.avg ? cur : min),
+        { pos: "—", avg: Infinity }
+      ).pos;
+      const owner = users?.find((u) => u.user_id === r.owner_id)?.display_name || `Roster ${r.roster_id}`;
+      return { rosterId: r.roster_id, owner, rating, strength, weakness };
+    }).sort((a, b) => b.rating - a.rating);
+  }, [rosters, players, trendingAdd, users]);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.body" }}>
@@ -393,132 +439,162 @@ export default function App() {
         )}
 
         {leagueId && (
-          <Grid container spacing={2}>
-            <Grid xs={12} lg={4}>
-              <Stack spacing={2}>
-                <InfoCard
-                  title="Starters"
-                  icon={<Users size={20} />}
-                  subtitle={`of ${myRoster?.players.length ?? 0} players`}
-                  value={String(myRoster?.starters.length ?? 0)}
-                />
-                <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                    <TrendingUp size={20} />
-                    <Typography level="body-sm">Needs focus</Typography>
-                  </Box>
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                    {needs.length === 0 ? (
-                      <Typography level="body-sm" color="neutral">
-                        Balanced
-                      </Typography>
-                    ) : (
-                      needs.map((n, i) => <StatusBadge key={i} label={n} />)
-                    )}
-                  </Box>
-                </Sheet>
-                <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                    <LineIcon size={20} />
-                    <Typography level="body-sm">Positional mix</Typography>
-                  </Box>
-                  <Box sx={{ height: 180 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={posCounts}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="pos" />
-                        <YAxis allowDecimals={false} />
-                        <ReTooltip />
-                        <Bar dataKey="count" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Box>
-                </Sheet>
-              </Stack>
-            </Grid>
-            <Grid xs={12} lg={8}>
-              <Stack spacing={2}>
-                <TableCard
-                  title="Roster"
-                  headers={["Name", "Pos", "Team", "Age", "Bye", "Injury", "Tier", "Start"]}
-                >
-                  {rosterRows.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.name}</td>
-                      <td>{r.pos}</td>
-                      <td>{r.team}</td>
-                      <td>{r.age || "—"}</td>
-                      <td>{r.bye}</td>
-                      <td style={{ maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {r.injury || ""}
-                      </td>
-                      <td>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Box
-                            sx={{
-                              height: 8,
-                              width: 96,
-                              bgcolor: "neutral.300",
-                              borderRadius: "sm",
-                              overflow: "hidden",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                height: "100%",
-                                bgcolor: "primary.500",
-                                width: `${Math.round((r.tier || 0) * 100)}%`,
-                              }}
-                            />
-                          </Box>
-                          <Typography level="body-xs" sx={{ fontFamily: "monospace" }}>
-                            {(r.tier || 0).toFixed(2)}
+          <Tabs value={view} onChange={(_, v) => setView(v as "team" | "all")} sx={{ mb: 2 }}>
+            <TabList>
+              <Tab value="team">Team Detail</Tab>
+              <Tab value="all">All Teams</Tab>
+            </TabList>
+            <TabPanel value="team" sx={{ p: 0, pt: 2 }}>
+              <Grid container spacing={2}>
+                <Grid xs={12} lg={4}>
+                  <Stack spacing={2}>
+                    <InfoCard
+                      title="Starters"
+                      icon={<Users size={20} />}
+                      subtitle={`of ${roster?.players.length ?? 0} players`}
+                      value={String(roster?.starters.length ?? 0)}
+                    />
+                    <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                        <TrendingUp size={20} />
+                        <Typography level="body-sm">Needs focus</Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                        {needs.length === 0 ? (
+                          <Typography level="body-sm" color="neutral">
+                            Balanced
                           </Typography>
-                        </Box>
-                      </td>
-                      <td>
-                        {r.starter ? (
-                          <StatusBadge label="Starter" color="success" />
                         ) : (
-                          <Typography level="body-xs" color="neutral">
-                            —
-                          </Typography>
+                          needs.map((n, i) => <StatusBadge key={i} label={n} />)
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </TableCard>
+                      </Box>
+                    </Sheet>
+                    <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                        <LineIcon size={20} />
+                        <Typography level="body-sm">Positional mix</Typography>
+                      </Box>
+                      <Box sx={{ height: 180 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={posCounts}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="pos" />
+                            <YAxis allowDecimals={false} />
+                            <ReTooltip />
+                            <Bar dataKey="count" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    </Sheet>
+                  </Stack>
+                </Grid>
+                <Grid xs={12} lg={8}>
+                  <Stack spacing={2}>
+                    <TableCard
+                      title="Roster"
+                      headers={["Name", "Pos", "Team", "Age", "Bye", "Injury", "Tier", "Start"]}
+                    >
+                      {rosterRows.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.name}</td>
+                          <td>{r.pos}</td>
+                          <td>{r.team}</td>
+                          <td>{r.age || "—"}</td>
+                          <td>{r.bye}</td>
+                          <td style={{ maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {r.injury || ""}
+                          </td>
+                          <td>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Box
+                                sx={{
+                                  height: 8,
+                                  width: 96,
+                                  bgcolor: "neutral.300",
+                                  borderRadius: "sm",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    height: "100%",
+                                    bgcolor: "primary.500",
+                                    width: `${Math.round((r.tier || 0) * 100)}%`,
+                                  }}
+                                />
+                              </Box>
+                              <Typography level="body-xs" sx={{ fontFamily: "monospace" }}>
+                                {(r.tier || 0).toFixed(2)}
+                              </Typography>
+                            </Box>
+                          </td>
+                          <td>
+                            {r.starter ? (
+                              <StatusBadge label="Starter" color="success" />
+                            ) : (
+                              <Typography level="body-xs" color="neutral">
+                                —
+                              </Typography>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </TableCard>
 
-                <TableCard
-                  title="Trade / Waiver Targets"
-                  headers={["Name", "Pos", "Team", "Tier", "Fit", "Score"]}
-                >
-                  {targets.map((t) => (
-                    <tr key={t.id}>
-                      <td>{t.name}</td>
-                      <td>{t.pos}</td>
-                      <td>{t.team}</td>
-                      <td>{t.tier.toFixed(2)}</td>
-                      <td>
-                        {t.fit ? (
-                          <StatusBadge label="Need" color="warning" />
-                        ) : (
-                          <Typography level="body-xs" color="neutral">
-                            —
-                          </Typography>
-                        )}
-                      </td>
-                      <td>
-                        <Typography level="body-sm" fontWeight="md">
-                          {t.score.toFixed(2)}
-                        </Typography>
-                      </td>
-                    </tr>
-                  ))}
-                </TableCard>
-              </Stack>
-            </Grid>
-          </Grid>
+                    <TableCard
+                      title="Trade / Waiver Targets"
+                      headers={["Name", "Pos", "Team", "Tier", "Fit", "Score"]}
+                    >
+                      {targets.map((t) => (
+                        <tr key={t.id}>
+                          <td>{t.name}</td>
+                          <td>{t.pos}</td>
+                          <td>{t.team}</td>
+                          <td>{t.tier.toFixed(2)}</td>
+                          <td>
+                            {t.fit ? (
+                              <StatusBadge label="Need" color="warning" />
+                            ) : (
+                              <Typography level="body-xs" color="neutral">
+                                —
+                              </Typography>
+                            )}
+                          </td>
+                          <td>
+                            <Typography level="body-sm" fontWeight="md">
+                              {t.score.toFixed(2)}
+                            </Typography>
+                          </td>
+                        </tr>
+                      ))}
+                    </TableCard>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel value="all" sx={{ p: 0, pt: 2 }}>
+              <TableCard
+                title="Team Comparison"
+                headers={["Team", "Rating", "Top Strength", "Top Weakness"]}
+              >
+                {teamRatings.map((t) => (
+                  <tr
+                    key={t.rosterId}
+                    onClick={() => {
+                      setSelectedRosterId(t.rosterId);
+                      setView("team");
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <td>{t.owner}</td>
+                    <td>{t.rating.toFixed(2)}</td>
+                    <td>{t.strength}</td>
+                    <td>{t.weakness}</td>
+                  </tr>
+                ))}
+              </TableCard>
+            </TabPanel>
+          </Tabs>
         )}
 
         {!leagueId && (
