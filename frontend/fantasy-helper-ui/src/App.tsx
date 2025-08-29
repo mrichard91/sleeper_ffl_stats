@@ -37,6 +37,7 @@ import Field from "./components/Field";
 import InfoCard from "./components/InfoCard";
 import StatusBadge from "./components/StatusBadge";
 import TableCard from "./components/TableCard";
+import TradeTargets from "./components/TradeTargets";
 
 /**
  * Fantasy Helper — React Frontend (Sleeper)
@@ -177,7 +178,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const proxyOk = useProxyAvailable();
   const mockMode = proxyOk === false;
-  const [view, setView] = useState<"team" | "all">("team");
+  const [view, setView] = useState<"team" | "all" | "targets">("team");
   const [selectedRosterId, setSelectedRosterId] = useState<number | undefined>(undefined);
   const [sortByPos, setSortByPos] = useState(false);
 
@@ -457,10 +458,11 @@ export default function App() {
         )}
 
         {leagueId && (
-          <Tabs value={view} onChange={(_, v) => setView(v as "team" | "all")} sx={{ mb: 2 }}>
+          <Tabs value={view} onChange={(_, v) => setView(v as "team" | "all" | "targets")} sx={{ mb: 2 }}>
             <TabList>
               <Tab value="team">Team Detail</Tab>
-              <Tab value="all">All Teams</Tab>
+              <Tab value="all">Team List</Tab>
+              <Tab value="targets">Trade / Waiver</Tab>
             </TabList>
             <TabPanel value="team" sx={{ p: 0, pt: 2 }}>
               <Grid container spacing={2}>
@@ -572,34 +574,6 @@ export default function App() {
                         </tr>
                       ))}
                     </TableCard>
-
-                    <TableCard
-                      title="Trade / Waiver Targets"
-                      headers={["Name", "Pos", "Team", "Tier", "Fit", "Score"]}
-                    >
-                      {targets.map((t) => (
-                        <tr key={t.id}>
-                          <td>{t.name}</td>
-                          <td>{t.pos}</td>
-                          <td>{t.team}</td>
-                          <td>{t.tier.toFixed(2)}</td>
-                          <td>
-                            {t.fit ? (
-                              <StatusBadge label="Need" color="warning" />
-                            ) : (
-                              <Typography level="body-xs" color="neutral">
-                                —
-                              </Typography>
-                            )}
-                          </td>
-                          <td>
-                            <Typography level="body-sm" fontWeight="md">
-                              {t.score.toFixed(2)}
-                            </Typography>
-                          </td>
-                        </tr>
-                      ))}
-                    </TableCard>
                   </Stack>
                 </Grid>
               </Grid>
@@ -625,6 +599,9 @@ export default function App() {
                   </tr>
                 ))}
               </TableCard>
+            </TabPanel>
+            <TabPanel value="targets" sx={{ p: 0, pt: 2 }}>
+              <TradeTargets targets={targets} />
             </TabPanel>
           </Tabs>
         )}
