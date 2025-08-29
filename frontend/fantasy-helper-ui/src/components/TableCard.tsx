@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 interface TableCardProps {
   title: string;
-  headers: string[];
+  headers: ReactNode[];
   children: ReactNode;
 }
 
@@ -16,8 +16,8 @@ export default function TableCard({ title, headers, children }: TableCardProps) 
       <Table stickyHeader hoverRow>
         <thead>
           <tr>
-            {headers.map((h) => (
-              <th key={h}>{h}</th>
+            {headers.map((h, i) => (
+              <th key={i}>{h}</th>
             ))}
           </tr>
         </thead>

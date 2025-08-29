@@ -179,6 +179,7 @@ export default function App() {
   const mockMode = proxyOk === false;
   const [view, setView] = useState<"team" | "all">("team");
   const [selectedRosterId, setSelectedRosterId] = useState<number | undefined>(undefined);
+  const [sortByPos, setSortByPos] = useState(false);
 
   async function loadLeagues() {
     setLoading(true);
@@ -242,7 +243,7 @@ export default function App() {
   const rosterRows = useMemo(() => {
     if (!roster || !players) return [] as any[];
     const trend = trendingAdd || [];
-    return roster.players.map((pid) => {
+    const rows = roster.players.map((pid) => {
       const p = players[pid];
       const tier = computeTierScore(pid, trend);
       const starter = startersSet.has(pid);
@@ -257,8 +258,16 @@ export default function App() {
         tier,
         starter,
       };
-    }).sort((a, b) => (a.starter === b.starter ? b.tier - a.tier : a.starter ? -1 : 1));
-  }, [roster, players, trendingAdd, startersSet]);
+    });
+    if (sortByPos) {
+      return rows.sort((a, b) => {
+        const posComp = a.pos.localeCompare(b.pos);
+        if (posComp !== 0) return posComp;
+        return a.starter === b.starter ? b.tier - a.tier : a.starter ? -1 : 1;
+      });
+    }
+    return rows.sort((a, b) => (a.starter === b.starter ? b.tier - a.tier : a.starter ? -1 : 1));
+  }, [roster, players, trendingAdd, startersSet, sortByPos]);
 
   const posCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -313,15 +322,24 @@ export default function App() {
       const posAvgs = Object.entries(tiersByPos).map(([pos, arr]) => ({
         pos,
         avg: arr.reduce((a, b) => a + b, 0) / arr.length,
+        count: arr.length,
       }));
-      const strength = posAvgs.reduce(
+      const top = posAvgs.reduce(
         (max, cur) => (cur.avg > max.avg ? cur : max),
-        { pos: "—", avg: -Infinity }
-      ).pos;
-      const weakness = posAvgs.reduce(
+        { pos: "—", avg: -Infinity, count: 0 }
+      );
+      const bottom = posAvgs.reduce(
         (min, cur) => (cur.avg < min.avg ? cur : min),
-        { pos: "—", avg: Infinity }
-      ).pos;
+        { pos: "—", avg: Infinity, count: 0 }
+      );
+      const strength =
+        top.pos === "—"
+          ? "—"
+          : `${top.pos} (avg ${top.avg.toFixed(2)} across ${top.count} players)`;
+      const weakness =
+        bottom.pos === "—"
+          ? "—"
+          : `${bottom.pos} (avg ${bottom.avg.toFixed(2)} across ${bottom.count} players)`;
       const owner = users?.find((u) => u.user_id === r.owner_id)?.display_name || `Roster ${r.roster_id}`;
       return { rosterId: r.roster_id, owner, rating, strength, weakness };
     }).sort((a, b) => b.rating - a.rating);
@@ -492,7 +510,21 @@ export default function App() {
                   <Stack spacing={2}>
                     <TableCard
                       title="Roster"
-                      headers={["Name", "Pos", "Team", "Age", "Bye", "Injury", "Tier", "Start"]}
+                      headers={[
+                        "Name",
+                        <Box
+                          onClick={() => setSortByPos((p) => !p)}
+                          sx={{ cursor: "pointer", userSelect: "none" }}
+                        >
+                          {`Pos${sortByPos ? " \u2191" : " \u21C5"}`}
+                        </Box>,
+                        "Team",
+                        "Age",
+                        "Bye",
+                        "Injury",
+                        "Tier",
+                        "Start",
+                      ]}
                     >
                       {rosterRows.map((r) => (
                         <tr key={r.id}>
