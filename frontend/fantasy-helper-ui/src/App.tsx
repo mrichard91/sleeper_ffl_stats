@@ -1,5 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { TrendingUp, Users, Trophy, Shield, LineChart as LineIcon, RefreshCw, Search, CloudOff } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  TrendingUp,
+  Users,
+  Trophy,
+  Shield,
+  LineChart as LineIcon,
+  RefreshCw,
+  Search,
+  CloudOff,
+} from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -9,6 +18,21 @@ import {
   Tooltip as ReTooltip,
   Bar,
 } from "recharts";
+import {
+  Box,
+  Button,
+  Card,
+  Grid,
+  Input,
+  Sheet,
+  Typography,
+} from "@mui/joy";
+import Stack from "@mui/joy/Stack";
+import Chip from "@mui/joy/Chip";
+import Field from "./components/Field";
+import InfoCard from "./components/InfoCard";
+import StatusBadge from "./components/StatusBadge";
+import TableCard from "./components/TableCard";
 
 /**
  * Fantasy Helper — React Frontend (Sleeper)
@@ -51,8 +75,6 @@ export type User = { user_id: string; display_name?: string };
 export type TrendingItem = { player_id: string; count: number };
 
 // ===== Helpers =====
-const cls = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(" ");
-
 async function safeJSON<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, init);
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -260,252 +282,272 @@ export default function App() {
   }, [players, myRoster, trendingAdd, needs, rosterRows.length]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/70 backdrop-blur border-b border-slate-200">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-indigo-600" />
-            <span className="text-base font-semibold tracking-tight">Fantasy Helper</span>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.body" }}>
+      <Sheet
+        variant="outlined"
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          backdropFilter: "blur(8px)",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Box
+          sx={{
+            maxWidth: "1024px",
+            mx: "auto",
+            p: 1.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Shield size={20} />
+            <Typography level="title-md">Fantasy Helper</Typography>
+          </Box>
+          <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
             {proxyOk === false && (
-              <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
-                <CloudOff className="w-4 h-4" /> Mock Mode
-              </span>
+              <Chip size="sm" color="warning" variant="soft" startDecorator={<CloudOff size={16} />}>
+                Mock Mode
+              </Chip>
             )}
-            <button
+            <Button
+              variant="outlined"
+              size="sm"
+              startDecorator={<RefreshCw size={16} />}
               onClick={() => window.location.reload()}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50"
-              title="Reload"
             >
-              <RefreshCw className="w-4 h-4" /> Reload
-            </button>
-          </div>
-        </div>
-      </header>
+              Reload
+            </Button>
+          </Box>
+        </Box>
+      </Sheet>
 
-      {/* Main */}
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        {/* Controls */}
-        <section className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Field label="Username">
-            <input
-              value={username as string}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Sleeper username"
-            />
-          </Field>
-          <Field label="Season">
-            <input
-              value={season as string}
-              onChange={(e) => setSeason(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="2025"
-            />
-          </Field>
-          <div className="flex items-end">
-            <button
+      <Box sx={{ maxWidth: "1024px", mx: "auto", p: 2 }}>
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid xs={12} md={4}>
+            <Field label="Username">
+              <Input
+                value={username as string}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Sleeper username"
+              />
+            </Field>
+          </Grid>
+          <Grid xs={12} md={4}>
+            <Field label="Season">
+              <Input
+                value={season as string}
+                onChange={(e) => setSeason(e.target.value)}
+                placeholder="2025"
+              />
+            </Field>
+          </Grid>
+          <Grid xs={12} md={4} sx={{ display: "flex", alignItems: "flex-end" }}>
+            <Button
               onClick={loadLeagues}
               disabled={loading}
-              className={cls(
-                "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium",
-                "bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 w-full"
-              )}
+              startDecorator={<Search size={16} />}
+              fullWidth
             >
-              <Search className="w-4 h-4" /> Load Leagues
-            </button>
-          </div>
-          <div className="md:col-span-3 text-xs text-slate-500 -mt-2">API: {proxyOk === null ? "…" : proxyOk ? "connected" : "offline"}</div>
-        </section>
+              Load Leagues
+            </Button>
+          </Grid>
+          <Grid xs={12}>
+            <Typography level="body-xs">
+              API: {proxyOk === null ? "…" : proxyOk ? "connected" : "offline"}
+            </Typography>
+          </Grid>
+        </Grid>
 
-        {/* Leagues */}
         {leagues && leagues.length > 0 && (
-          <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">Leagues</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Box sx={{ mb: 3 }}>
+            <Typography level="title-lg" sx={{ mb: 1 }}>
+              Leagues
+            </Typography>
+            <Grid container spacing={2}>
               {leagues.map((lg) => (
-                <button
-                  key={lg.league_id}
-                  onClick={() => loadLeague(lg.league_id)}
-                  className={cls(
-                    "bg-white border rounded-2xl p-4 text-left shadow-sm hover:shadow transition",
-                    leagueId === lg.league_id && "ring-2 ring-indigo-500"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium truncate">{lg.name || lg.league_id}</div>
-                    <Trophy className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <div className="text-sm text-slate-500 mt-1">Season {lg.season} · {lg.total_rosters ?? "?"} teams</div>
-                </button>
+                <Grid xs={12} md={4} key={lg.league_id}>
+                  <Card
+                    variant={leagueId === lg.league_id ? "solid" : "outlined"}
+                    onClick={() => loadLeague(lg.league_id)}
+                    sx={{ cursor: "pointer" }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography level="body-md" noWrap sx={{ mr: 1 }}>
+                        {lg.name || lg.league_id}
+                      </Typography>
+                      <Trophy size={16} />
+                    </Box>
+                    <Typography level="body-sm">
+                      Season {lg.season} · {lg.total_rosters ?? "?"} teams
+                    </Typography>
+                  </Card>
+                </Grid>
               ))}
-            </div>
-          </section>
+            </Grid>
+          </Box>
         )}
 
-        {/* Dashboard */}
         {leagueId && (
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Left: Summary cards */}
-            <div className="space-y-4">
-              <Card title="Starters" icon={<Users className="w-5 h-5 text-sky-600" />}
-                    subtitle={`of ${myRoster?.players.length ?? 0} players`}
-                    value={String(myRoster?.starters.length ?? 0)} />
+          <Grid container spacing={2}>
+            <Grid xs={12} lg={4}>
+              <Stack spacing={2}>
+                <InfoCard
+                  title="Starters"
+                  icon={<Users size={20} />}
+                  subtitle={`of ${myRoster?.players.length ?? 0} players`}
+                  value={String(myRoster?.starters.length ?? 0)}
+                />
+                <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                    <TrendingUp size={20} />
+                    <Typography level="body-sm">Needs focus</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {needs.length === 0 ? (
+                      <Typography level="body-sm" color="neutral">
+                        Balanced
+                      </Typography>
+                    ) : (
+                      needs.map((n, i) => <StatusBadge key={i} label={n} />)
+                    )}
+                  </Box>
+                </Sheet>
+                <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                    <LineIcon size={20} />
+                    <Typography level="body-sm">Positional mix</Typography>
+                  </Box>
+                  <Box sx={{ height: 180 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={posCounts}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="pos" />
+                        <YAxis allowDecimals={false} />
+                        <ReTooltip />
+                        <Bar dataKey="count" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Sheet>
+              </Stack>
+            </Grid>
+            <Grid xs={12} lg={8}>
+              <Stack spacing={2}>
+                <TableCard
+                  title="Roster"
+                  headers={["Name", "Pos", "Team", "Age", "Bye", "Injury", "Tier", "Start"]}
+                >
+                  {rosterRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td>{r.pos}</td>
+                      <td>{r.team}</td>
+                      <td>{r.age || "—"}</td>
+                      <td>{r.bye}</td>
+                      <td style={{ maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {r.injury || ""}
+                      </td>
+                      <td>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box
+                            sx={{
+                              height: 8,
+                              width: 96,
+                              bgcolor: "neutral.300",
+                              borderRadius: "sm",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                height: "100%",
+                                bgcolor: "primary.500",
+                                width: `${Math.round((r.tier || 0) * 100)}%`,
+                              }}
+                            />
+                          </Box>
+                          <Typography level="body-xs" sx={{ fontFamily: "monospace" }}>
+                            {(r.tier || 0).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </td>
+                      <td>
+                        {r.starter ? (
+                          <StatusBadge label="Starter" color="success" />
+                        ) : (
+                          <Typography level="body-xs" color="neutral">
+                            —
+                          </Typography>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </TableCard>
 
-              <div className="bg-white border rounded-2xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-1">
-                  <TrendingUp className="w-5 h-5 text-emerald-600" />
-                  <div className="text-sm text-slate-600">Needs focus</div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {needs.length === 0 ? (
-                    <span className="text-sm text-slate-500">Balanced</span>
-                  ) : (
-                    needs.map((n, i) => <Badge key={i} label={n} />)
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white border rounded-2xl p-4 shadow-sm">
-                <div className="flex items-center gap-3 mb-1">
-                  <LineIcon className="w-5 h-5 text-indigo-600" />
-                  <div className="text-sm text-slate-600">Positional mix</div>
-                </div>
-                <div className="mt-3 h-44">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={posCounts}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="pos" />
-                      <YAxis allowDecimals={false} />
-                      <ReTooltip />
-                      <Bar dataKey="count" radius={[6,6,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: tables */}
-            <div className="lg:col-span-2 space-y-4">
-              <TableCard title="Roster" headers={["Name","Pos","Team","Age","Bye","Injury","Tier","Start"]}>
-                {rosterRows.map((r) => (
-                  <tr key={r.id} className="border-t hover:bg-slate-50">
-                    <Td>{r.name}</Td>
-                    <Td>{r.pos}</Td>
-                    <Td>{r.team}</Td>
-                    <Td>{r.age || "—"}</Td>
-                    <Td>{r.bye}</Td>
-                    <Td className="truncate max-w-[140px]">{r.injury || ""}</Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-24 rounded bg-slate-200 overflow-hidden">
-                          <div className="h-full bg-indigo-600" style={{ width: `${Math.round((r.tier || 0) * 100)}%` }} />
-                        </div>
-                        <span className="tabular-nums text-xs text-slate-600">{(r.tier || 0).toFixed(2)}</span>
-                      </div>
-                    </Td>
-                    <Td>{r.starter ? <Badge label="Starter" tone="emerald" /> : <span className="text-slate-400">—</span>}</Td>
-                  </tr>
-                ))}
-              </TableCard>
-
-              <TableCard title="Trade / Waiver Targets" headers={["Name","Pos","Team","Tier","Fit","Score"]}>
-                {targets.map((t) => (
-                  <tr key={t.id} className="border-t hover:bg-slate-50">
-                    <Td>{t.name}</Td>
-                    <Td>{t.pos}</Td>
-                    <Td>{t.team}</Td>
-                    <Td>{t.tier.toFixed(2)}</Td>
-                    <Td>{t.fit ? <Badge label="Need" tone="amber" /> : <span className="text-slate-400">—</span>}</Td>
-                    <Td className="font-medium">{t.score.toFixed(2)}</Td>
-                  </tr>
-                ))}
-              </TableCard>
-            </div>
-          </section>
+                <TableCard
+                  title="Trade / Waiver Targets"
+                  headers={["Name", "Pos", "Team", "Tier", "Fit", "Score"]}
+                >
+                  {targets.map((t) => (
+                    <tr key={t.id}>
+                      <td>{t.name}</td>
+                      <td>{t.pos}</td>
+                      <td>{t.team}</td>
+                      <td>{t.tier.toFixed(2)}</td>
+                      <td>
+                        {t.fit ? (
+                          <StatusBadge label="Need" color="warning" />
+                        ) : (
+                          <Typography level="body-xs" color="neutral">
+                            —
+                          </Typography>
+                        )}
+                      </td>
+                      <td>
+                        <Typography level="body-sm" fontWeight="md">
+                          {t.score.toFixed(2)}
+                        </Typography>
+                      </td>
+                    </tr>
+                  ))}
+                </TableCard>
+              </Stack>
+            </Grid>
+          </Grid>
         )}
 
         {!leagueId && (
-          <div className="mt-10 grid place-items-center gap-2 text-center">
-            <div className="text-xl font-semibold">Welcome 👋</div>
-            <p className="text-slate-600 max-w-xl">
-              Enter your Sleeper <span className="font-medium">username</span> and a <span className="font-medium">season</span>, then click
-              <span className="font-semibold"> Load Leagues</span>. Select a league to see your roster, needs, and suggested targets.
-            </p>
+          <Box sx={{ mt: 6, textAlign: "center" }}>
+            <Typography level="h4" sx={{ mb: 1 }}>
+              Welcome 👋
+            </Typography>
+            <Typography sx={{ maxWidth: 480, mx: "auto" }}>
+              Enter your Sleeper <b>username</b> and a <b>season</b>, then click <b>Load Leagues</b>. Select a league to see your
+              roster, needs, and suggested targets.
+            </Typography>
             {proxyOk === false && (
-              <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 max-w-xl">
-                API proxy not detected. You're in <span className="font-semibold">Mock Mode</span>. You can still click around.
-              </div>
+              <Sheet
+                variant="soft"
+                color="warning"
+                sx={{ mt: 2, p: 2, borderRadius: "md", maxWidth: 480, mx: "auto" }}
+              >
+                <Typography level="body-sm">
+                  API proxy not detected. You're in <b>Mock Mode</b>. You can still click around.
+                </Typography>
+              </Sheet>
             )}
-          </div>
+          </Box>
         )}
-      </main>
+      </Box>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-10 pt-6 text-xs text-slate-500">
+      <Typography level="body-xs" sx={{ textAlign: "center", py: 4 }}>
         Built for Sleeper leagues · Local cached proxy · No API keys required.
-      </footer>
-    </div>
+      </Typography>
+    </Box>
   );
-}
-
-// ===== Reusable UI bits =====
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="bg-white border rounded-2xl p-4 shadow-sm text-sm text-slate-600 grid gap-2">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Card({ title, value, subtitle, icon }: { title: string; value: string; subtitle?: string; icon?: React.ReactNode }) {
-  return (
-    <div className="bg-white border rounded-2xl p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        {icon}
-        <div className="text-sm text-slate-600">{title}</div>
-      </div>
-      <div className="mt-2 text-2xl font-semibold leading-tight">{value}</div>
-      {subtitle && <div className="text-xs text-slate-500">{subtitle}</div>}
-    </div>
-  );
-}
-
-function Badge({ label, tone = "indigo" }: { label: string; tone?: "indigo" | "emerald" | "amber" }) {
-  const palette: Record<string, string> = {
-    indigo: "bg-indigo-100 text-indigo-700",
-    emerald: "bg-emerald-100 text-emerald-700",
-    amber: "bg-amber-100 text-amber-800",
-  };
-  return (
-    <span className={cls("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", palette[tone])}>
-      {label}
-    </span>
-  );
-}
-
-function TableCard({ title, headers, children }: { title: string; headers: string[]; children: React.ReactNode }) {
-  return (
-    <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b font-medium">{title}</div>
-      <div className="overflow-auto max-h-[60vh]">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10">
-            <tr>
-              {headers.map((h) => (
-                <th key={h} className="text-left font-medium px-4 py-2 whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">{children}</tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="px-4 py-2 whitespace-nowrap align-middle">{children}</td>;
 }
