@@ -33,6 +33,7 @@ import {
 } from "@mui/joy";
 import Stack from "@mui/joy/Stack";
 import Chip from "@mui/joy/Chip";
+import Tooltip from "@mui/joy/Tooltip";
 import Field from "./components/Field";
 import InfoCard from "./components/InfoCard";
 import StatusBadge from "./components/StatusBadge";
@@ -157,10 +158,11 @@ function useProxyAvailable() {
   return ok; // null=loading
 }
 
-// Tier heuristic (log of trending)
+// Tier heuristic (log of trending) on a 1-5 scale (1=best, 5=worst)
 function computeTierScore(playerId: string, trending: TrendingItem[]): number {
   const t = trending.find((x) => x.player_id === playerId)?.count ?? 0;
-  return t > 0 ? Math.min(1, Math.log10(1 + t) / 5) : 0;
+  const norm = t > 0 ? Math.min(1, Math.log10(1 + t) / 5) : 0; // 0..1
+  return Math.max(1, 5 - Math.floor(norm * 5));
 }
 const positionOf = (p?: PlayerMeta) => p?.position || "";
 const nameOf = (p?: PlayerMeta) => p?.full_name || `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim();
@@ -263,10 +265,10 @@ export default function App() {
       return rows.sort((a, b) => {
         const posComp = a.pos.localeCompare(b.pos);
         if (posComp !== 0) return posComp;
-        return a.starter === b.starter ? b.tier - a.tier : a.starter ? -1 : 1;
+        return a.starter === b.starter ? a.tier - b.tier : a.starter ? -1 : 1;
       });
     }
-    return rows.sort((a, b) => (a.starter === b.starter ? b.tier - a.tier : a.starter ? -1 : 1));
+    return rows.sort((a, b) => (a.starter === b.starter ? a.tier - b.tier : a.starter ? -1 : 1));
   }, [roster, players, trendingAdd, startersSet, sortByPos]);
 
   const posCounts = useMemo(() => {
@@ -298,7 +300,15 @@ export default function App() {
       .map((p) => {
         const tier = computeTierScore(p!.player_id, trendingAdd);
         const fit = needs.includes(positionOf(p)) ? 1 : 0;
-        return { id: p!.player_id, name: nameOf(p), pos: positionOf(p), team: p?.team || "", tier, fit, score: tier + 0.3 * fit };
+        return {
+          id: p!.player_id,
+          name: nameOf(p),
+          pos: positionOf(p),
+          team: p?.team || "",
+          tier,
+          fit,
+          score: (5 - tier) + 0.3 * fit,
+        };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 25);
@@ -325,12 +335,12 @@ export default function App() {
         count: arr.length,
       }));
       const top = posAvgs.reduce(
-        (max, cur) => (cur.avg > max.avg ? cur : max),
-        { pos: "—", avg: -Infinity, count: 0 }
-      );
-      const bottom = posAvgs.reduce(
         (min, cur) => (cur.avg < min.avg ? cur : min),
         { pos: "—", avg: Infinity, count: 0 }
+      );
+      const bottom = posAvgs.reduce(
+        (max, cur) => (cur.avg > max.avg ? cur : max),
+        { pos: "—", avg: -Infinity, count: 0 }
       );
       const strength =
         top.pos === "—"
@@ -342,7 +352,7 @@ export default function App() {
           : `${bottom.pos} (avg ${bottom.avg.toFixed(2)} across ${bottom.count} players)`;
       const owner = users?.find((u) => u.user_id === r.owner_id)?.display_name || `Roster ${r.roster_id}`;
       return { rosterId: r.roster_id, owner, rating, strength, weakness };
-    }).sort((a, b) => b.rating - a.rating);
+    }).sort((a, b) => a.rating - b.rating);
   }, [rosters, players, trendingAdd, users]);
 
   return (
@@ -522,7 +532,9 @@ export default function App() {
                         "Age",
                         "Bye",
                         "Injury",
-                        "Tier",
+                        <Tooltip title="Based on recent trending adds; 1 is best, 5 is worst">
+                          <span>Tier</span>
+                        </Tooltip>,
                         "Start",
                       ]}
                     >
@@ -551,12 +563,12 @@ export default function App() {
                                   sx={{
                                     height: "100%",
                                     bgcolor: "primary.500",
-                                    width: `${Math.round((r.tier || 0) * 100)}%`,
+                                    width: `${Math.round(((5 - (r.tier ?? 5)) / 4) * 100)}%`,
                                   }}
                                 />
                               </Box>
                               <Typography level="body-xs" sx={{ fontFamily: "monospace" }}>
-                                {(r.tier || 0).toFixed(2)}
+                                {r.tier ?? "—"}
                               </Typography>
                             </Box>
                           </td>
@@ -582,7 +594,7 @@ export default function App() {
                           <td>{t.name}</td>
                           <td>{t.pos}</td>
                           <td>{t.team}</td>
-                          <td>{t.tier.toFixed(2)}</td>
+                          <td>{t.tier}</td>
                           <td>
                             {t.fit ? (
                               <StatusBadge label="Need" color="warning" />
