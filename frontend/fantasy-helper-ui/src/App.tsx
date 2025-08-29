@@ -260,7 +260,7 @@ export default function App() {
   }, [players, myRoster, trendingAdd, needs, rosterRows.length]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white/70 backdrop-blur border-b border-slate-200">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
