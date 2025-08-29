@@ -1,0 +1,7 @@
+requests
+python-dotenv
+pandas
+gspread
+google-auth
+feedparser      # optional (news)
+nltk            # optional (VADER sentiment)

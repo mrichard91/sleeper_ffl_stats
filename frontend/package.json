@@ -1,0 +1,11 @@
+{
+  "name": "fantasy-helper",
+  "private": true,
+  "workspaces": ["server", "fantasy-helper-ui"],
+  "scripts": {
+    "dev": "concurrently -k -n SERVER,UI -c blue,green \"npm:dev --workspace=server\" \"npm:dev --workspace=fantasy-helper-ui\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
